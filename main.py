@@ -1,57 +1,88 @@
 import streamlit as st
 import random
+import string
+
+# 단어 리스트 (예시)
+WORDS = ["PYTHON", "STREAMLIT", "HANGMAN", "DEVELOPER", "COMPUTER", "PROGRAMMING", "ARTIFICIAL", "INTELLIGENCE"]
+
+# 행맨 이모지 그림 단계 (총 6단계)
+HANGMAN_PICS = [
+    "😀🙂😐",  # 처음 (아무도 없음)
+    "😵",      # 머리
+    "😵👕",   # 몸통
+    "😵👕👖", # 몸통 + 다리
+    "😵👕👖✋", # 한 팔
+    "😵👕👖✋✋"  # 두 팔 완성 (끝)
+]
+
+MAX_WRONG = len(HANGMAN_PICS) - 1
 
 # 페이지 설정
-st.set_page_config(page_title="가위✌️ 바위✊ 보✋ 게임", page_icon="🎮", layout="centered")
+st.set_page_config(page_title="🎉 단어 맞추기 게임 (Hangman) 🎉", page_icon="🕹️", layout="centered")
 
-# 타이틀 영역
 st.markdown("""
-    <h1 style='text-align: center; color: #FF4B4B;'>🎮 가위✌️ 바위✊ 보✋ 챌린지!</h1>
-    <h3 style='text-align: center; color: #1E90FF;'>AI와 대결해서 이겨보세요 😎</h3>
+    <h1 style="text-align: center; color: #FF6F61;">🕹️ 단어 맞추기 게임 (Hangman) 🕹️</h1>
+    <h3 style="text-align: center; color: #1E90FF;">알파벳을 맞춰 단어를 완성하세요! 🔤</h3>
 """, unsafe_allow_html=True)
 
-# 게임 옵션
-options = ["✌️ 가위", "✊ 바위", "✋ 보"]
-emoji_result = {
-    "win": "🏆 이겼어요! 축하해요! 🎉",
-    "lose": "😢 졌어요... 다음에 다시 도전해요!",
-    "draw": "🤝 비겼어요! 다시 도전해봐요~"
-}
-
 st.markdown("---")
 
-# 유저 선택
-user_choice = st.radio("👇 당신의 선택을 고르세요!", options, horizontal=True)
+# 세션 상태 초기화
+if "word" not in st.session_state:
+    st.session_state.word = random.choice(WORDS)
+    st.session_state.guessed = set()
+    st.session_state.wrong = 0
+    st.session_state.finished = False
+    st.session_state.message = ""
 
-# 게임 시작 버튼
-if st.button("🎲 게임 시작!"):
-    ai_choice = random.choice(options)
+def display_word():
+    displayed = " ".join([letter if letter in st.session_state.guessed else "⬜" for letter in st.session_state.word])
+    return displayed
+
+def check_win():
+    return all([l in st.session_state.guessed for l in st.session_state.word])
+
+# 게임 진행
+if not st.session_state.finished:
+    st.markdown(f"<p style='font-size: 40px; text-align:center;'>단어: <strong>{display_word()}</strong></p>", unsafe_allow_html=True)
+    st.markdown(f"<p style='font-size: 30px; text-align:center;'>남은 기회: <strong>{MAX_WRONG - st.session_state.wrong}</strong> ❌</p>", unsafe_allow_html=True)
+    st.markdown(f"<p style='font-size: 50px; text-align:center;'>{HANGMAN_PICS[st.session_state.wrong]}</p>", unsafe_allow_html=True)
     
-    # 결과 판정
-    result = ""
-    if user_choice == ai_choice:
-        result = "draw"
-    elif (
-        (user_choice == "✌️ 가위" and ai_choice == "✋ 보") or
-        (user_choice == "✊ 바위" and ai_choice == "✌️ 가위") or
-        (user_choice == "✋ 보" and ai_choice == "✊ 바위")
-    ):
-        result = "win"
-    else:
-        result = "lose"
+    guess = st.text_input("한 글자 입력 (영어 대문자만)", max_chars=1).upper()
 
-    # 결과 출력
+    if guess and guess in string.ascii_uppercase:
+        if guess in st.session_state.guessed:
+            st.warning(f"❗ 이미 '{guess}'를 입력했어요!")
+        else:
+            st.session_state.guessed.add(guess)
+            if guess not in st.session_state.word:
+                st.session_state.wrong += 1
+
+            if check_win():
+                st.session_state.finished = True
+                st.session_state.message = "🏆 축하합니다! 단어를 맞췄어요! 🎉"
+            elif st.session_state.wrong >= MAX_WRONG:
+                st.session_state.finished = True
+                st.session_state.message = f"💀 실패! 정답은 '{st.session_state.word}' 였어요! 다시 도전하세요! 🔄"
+
+        st.experimental_rerun()
+
+else:
+    # 게임 종료 메시지
+    color = "#28a745" if check_win() else "#dc3545"
     st.markdown(f"""
-        <div style='text-align: center; font-size: 30px;'>
-            🙋‍♂️ 당신: <strong>{user_choice}</strong><br>
-            🤖 AI: <strong>{ai_choice}</strong><br><br>
-            <span style='color: #FFD700;'>{emoji_result[result]}</span>
-        </div>
+        <h2 style='text-align:center; color: {color};'>{st.session_state.message}</h2>
+        <p style='font-size: 40px; text-align:center;'>단어: <strong>{st.session_state.word}</strong></p>
+        <p style='font-size: 60px; text-align:center;'>{HANGMAN_PICS[st.session_state.wrong]}</p>
     """, unsafe_allow_html=True)
 
-    st.balloons() if result == "win" else None
+    if st.button("🔄 다시 시작하기"):
+        st.session_state.word = random.choice(WORDS)
+        st.session_state.guessed = set()
+        st.session_state.wrong = 0
+        st.session_state.finished = False
+        st.session_state.message = ""
+        st.experimental_rerun()
 
-# 하단
 st.markdown("---")
-st.markdown("<p style='text-align: center;'>Made with ❤️ using Streamlit</p>", unsafe_allow_html=True)
-
+st.markdown("<p style='text-align: center;'>Made with ❤️ by ChatGPT & Streamlit</p>", unsafe_allow_html=True)
